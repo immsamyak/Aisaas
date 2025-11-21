@@ -26,6 +26,8 @@ echo ""
 # Pull latest changes
 cd $PROJECT_DIR
 echo "ℹ️  Pulling latest changes from GitHub..."
+# Stash any local changes that might conflict
+git stash
 git pull origin main
 echo -e "${GREEN}✅ Changes pulled${NC}"
 
