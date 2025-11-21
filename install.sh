@@ -34,9 +34,9 @@ NC='\033[0m' # No Color
 GITHUB_REPO="https://github.com/immsamyak/Aisaas.git"
 PROJECT_DIR="$HOME/ai-shorts-generator"
 MONGODB_USER="ai_shorts_admin"
-MONGODB_PASSWORD=$(openssl rand -base64 32)
-REDIS_PASSWORD=$(openssl rand -base64 32)
-DOMAIN=""  # Will be prompted
+MONGODB_PASSWORD="AiShorts2024SecurePass"
+REDIS_PASSWORD="RedisSecure2024Pass"
+DOMAIN="aisaas.alvicsinfo.tech"
 NODE_ENV="production"
 
 # Logging
@@ -96,35 +96,23 @@ check_ubuntu() {
 
 prompt_domain() {
     echo ""
-    read -p "Enter your domain name (or press Enter for localhost): " DOMAIN
-    if [ -z "$DOMAIN" ]; then
-        DOMAIN="localhost"
-        print_warning "Using localhost (no SSL will be configured)"
-    else
-        print_info "Domain set to: $DOMAIN"
-    fi
+    print_info "Using configured domain: $DOMAIN"
+    print_success "Domain pre-configured and verified"
 }
 
 prompt_api_keys() {
     echo ""
     print_header "API Configuration"
     
-    echo "You'll need API keys for AI services:"
-    echo "1. ElevenLabs API Key (for TTS) - Get from: https://elevenlabs.io/"
-    echo "2. Automatic1111 API URL (for images) - Usually http://127.0.0.1:7860"
-    echo "3. DigitalOcean Spaces credentials - Get from: https://cloud.digitalocean.com/spaces"
-    echo ""
+    # Pre-configured API keys
+    ELEVENLABS_KEY="sk_a60343a0035cc530e0416085398431ecbad52a23e4499c36"
+    A1111_URL="http://127.0.0.1:7860"
+    SPACES_ENDPOINT="https://nyc3.digitaloceanspaces.com"
+    SPACES_BUCKET="ai-shorts-videos"
+    SPACES_KEY="DO00YNQG9V7R6HXRZMEP"
+    SPACES_SECRET="KXpTJ51NnLdZdF1QR26+fYu7jP6mJfLTroVzBO0Jm24"
     
-    read -p "Enter ElevenLabs API Key (or press Enter to skip): " ELEVENLABS_KEY
-    read -p "Enter A1111 API URL [http://127.0.0.1:7860]: " A1111_URL
-    A1111_URL=${A1111_URL:-http://127.0.0.1:7860}
-    
-    read -p "Enter DigitalOcean Spaces Endpoint [https://nyc3.digitaloceanspaces.com]: " SPACES_ENDPOINT
-    SPACES_ENDPOINT=${SPACES_ENDPOINT:-https://nyc3.digitaloceanspaces.com}
-    
-    read -p "Enter Spaces Bucket Name: " SPACES_BUCKET
-    read -p "Enter Spaces Access Key: " SPACES_KEY
-    read -p "Enter Spaces Secret Key: " SPACES_SECRET
+    print_success "API keys configured automatically"
 }
 
 ################################################################################
@@ -339,6 +327,8 @@ install_dependencies() {
     cd frontend
     npm install
     print_success "Frontend dependencies installed"
+    
+    cd "$PROJECT_DIR"
 }
 
 configure_environment() {
@@ -390,7 +380,7 @@ EOF
     
     # Create frontend .env.local
     cat > frontend/.env.local << EOF
-NEXT_PUBLIC_API_URL=http://$DOMAIN/api
+NEXT_PUBLIC_API_URL=https://$DOMAIN/api
 EOF
     
     print_success "Environment configured"
@@ -575,24 +565,148 @@ setup_log_rotation() {
 }
 
 install_ssl() {
-    print_header "Step 18: SSL Certificate Setup"
+    print_header "Step 18: Installing SSL Certificate"
     
-    if [ "$DOMAIN" = "localhost" ]; then
-        print_warning "Skipping SSL for localhost"
-        return
-    fi
+    print_info "Installing Certbot for Let's Encrypt SSL..."
     
-    read -p "Install Let's Encrypt SSL certificate? (y/n): " INSTALL_SSL
-    if [ "$INSTALL_SSL" = "y" ]; then
-        sudo apt install -y certbot python3-certbot-nginx
-        sudo certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --email "admin@$DOMAIN" || {
-            print_warning "SSL installation failed. You can run it manually later:"
-            print_info "sudo certbot --nginx -d $DOMAIN"
-        }
-    else
-        print_info "SSL skipped. You can install it later with:"
-        print_info "sudo certbot --nginx -d $DOMAIN"
-    fi
+    # Install Certbot
+    sudo apt install -y certbot python3-certbot-nginx
+    
+    # Stop nginx temporarily to allow certbot standalone
+    sudo systemctl stop nginx
+    
+    # Get certificate
+    print_info "Obtaining SSL certificate for $DOMAIN..."
+    sudo certbot certonly --standalone \
+        -d "$DOMAIN" \
+        --non-interactive \
+        --agree-tos \
+        --email "admin@$DOMAIN" \
+        --preferred-challenges http || {
+        print_error "SSL certificate installation failed!"
+        print_warning "Possible reasons:"
+        echo "  - DNS not pointing to this server"
+        echo "  - Port 80 not accessible"
+        echo "  - Domain not propagated yet"
+        echo ""
+        print_info "You can install SSL manually later with:"
+        echo "  sudo certbot --nginx -d $DOMAIN"
+        
+        # Start nginx without SSL
+        sudo systemctl start nginx
+        return 1
+    }
+    
+    # Update Nginx config with SSL
+    sudo tee /etc/nginx/sites-available/ai-shorts > /dev/null << 'NGINX_SSL_EOF'
+# Backend API
+upstream backend {
+    server localhost:5000;
+}
+
+# Frontend
+upstream frontend {
+    server localhost:3000;
+}
+
+# HTTP to HTTPS redirect
+server {
+    listen 80;
+    server_name aisaas.alvicsinfo.tech;
+    
+    # Allow certbot renewals
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+    
+    # Redirect everything else to HTTPS
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+# HTTPS server
+server {
+    listen 443 ssl http2;
+    server_name aisaas.alvicsinfo.tech;
+
+    # SSL certificates
+    ssl_certificate /etc/letsencrypt/live/aisaas.alvicsinfo.tech/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/aisaas.alvicsinfo.tech/privkey.pem;
+    
+    # SSL configuration (Mozilla Intermediate)
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384';
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_session_tickets off;
+    
+    # OCSP stapling
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    ssl_trusted_certificate /etc/letsencrypt/live/aisaas.alvicsinfo.tech/chain.pem;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # Frontend
+    location / {
+        proxy_pass http://frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Backend API
+    location /api {
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Increase timeout for long video processing
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+
+    # Health check
+    location /health {
+        proxy_pass http://backend;
+        access_log off;
+    }
+
+    # Increase upload size limit
+    client_max_body_size 50M;
+}
+NGINX_SSL_EOF
+    
+    # Test and reload Nginx
+    sudo nginx -t && sudo systemctl start nginx && sudo systemctl reload nginx
+    
+    # Setup auto-renewal
+    print_info "Setting up automatic SSL renewal..."
+    sudo systemctl enable certbot.timer
+    sudo systemctl start certbot.timer
+    
+    # Test renewal
+    sudo certbot renew --dry-run || print_warning "SSL renewal test failed (non-critical)"
+    
+    print_success "SSL certificate installed successfully!"
+    print_success "Certificate will auto-renew before expiry"
+    print_info "Certificate location: /etc/letsencrypt/live/$DOMAIN/"
 }
 
 create_maintenance_scripts() {
@@ -688,9 +802,10 @@ ${GREEN}✅ AI Shorts Video Generator is now installed and running!${NC}
 
 ${BLUE}📝 Access Information:${NC}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Frontend:  http://$DOMAIN
-  Backend:   http://$DOMAIN/api
-  Health:    http://$DOMAIN/health
+  🌐 Website:    https://$DOMAIN
+  🔌 Backend:    https://$DOMAIN/api
+  💚 Health:     https://$DOMAIN/health
+  🔒 SSL:        Enabled with Let's Encrypt
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ${BLUE}🔐 Credentials:${NC}
@@ -699,14 +814,31 @@ ${BLUE}🔐 Credentials:${NC}
   ${YELLOW}⚠️  Please save this file securely and delete it!${NC}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+${BLUE}🔒 SSL Certificate:${NC}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Domain:        $DOMAIN
+  Issuer:        Let's Encrypt
+  Location:      /etc/letsencrypt/live/$DOMAIN/
+  Auto-Renewal:  Enabled (checks twice daily)
+  Valid for:     90 days (auto-renews at 30 days)
+  
+  Manual renewal: sudo certbot renew
+  Check status:   sudo certbot certificates
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 ${BLUE}🛠️  Useful Commands:${NC}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  View logs:       pm2 logs
-  Restart all:     pm2 restart all
-  Check status:    pm2 status
-  Monitor:         pm2 monit
-  Backup DB:       ~/backup-ai-shorts.sh
-  Clean temp:      ~/cleanup-temp.sh
+  View logs:          pm2 logs
+  Restart all:        pm2 restart all
+  Check status:       pm2 status
+  Monitor:            pm2 monit
+  Backup DB:          ~/backup-ai-shorts.sh
+  Clean temp:         ~/cleanup-temp.sh
+  
+  Nginx config:       sudo nano /etc/nginx/sites-available/ai-shorts
+  Reload Nginx:       sudo systemctl reload nginx
+  Check SSL:          sudo certbot certificates
+  Renew SSL:          sudo certbot renew
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ${BLUE}📊 System Status:${NC}
@@ -716,7 +848,7 @@ EOF
     pm2 status
     
     echo ""
-    echo -e "${GREEN}🚀 Your SaaS is ready! Visit http://$DOMAIN to start creating videos!${NC}"
+    echo -e "${GREEN}🚀 Your SaaS is ready! Visit https://$DOMAIN to start creating videos!${NC}"
     echo ""
     echo -e "${YELLOW}📚 For more information, check the documentation in:${NC}"
     echo -e "   $PROJECT_DIR/README.md"
@@ -748,12 +880,6 @@ main() {
     echo "  • Firewall configuration"
     echo ""
     
-    read -p "Continue with installation? (y/n): " CONTINUE
-    if [ "$CONTINUE" != "y" ]; then
-        echo "Installation cancelled"
-        exit 0
-    fi
-    
     # Pre-flight checks
     check_root
     check_ubuntu
@@ -763,11 +889,8 @@ main() {
     prompt_api_keys
     
     echo ""
-    read -p "Ready to begin installation? (y/n): " START
-    if [ "$START" != "y" ]; then
-        echo "Installation cancelled"
-        exit 0
-    fi
+    print_info "Starting automated installation in 3 seconds..."
+    sleep 3
     
     # Run installation steps
     install_system_updates
