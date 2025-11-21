@@ -361,11 +361,11 @@ export async function generateSceneImage(sceneText, sceneIndex, style = 'realist
   const prompt = buildPrompt(sceneText, style);
   
   // Choose API based on environment variable
-  const apiType = process.env.IMAGE_API_TYPE || 'huggingface';
+  const apiType = process.env.IMAGE_API_TYPE || 'quick';
   
   try {
     if (apiType === 'huggingface' || apiType === 'hf') {
-      // Use free Hugging Face API (default)
+      // Use Hugging Face API (requires paid tier now)
       return await generateWithHuggingFace(prompt, outputPath);
     } else if (apiType === 'comfyui') {
       return await generateWithComfyUI(prompt, outputPath);
@@ -373,13 +373,10 @@ export async function generateSceneImage(sceneText, sceneIndex, style = 'realist
       return await generateWithA1111(prompt, outputPath);
     } else if (apiType === 'local') {
       return await generateWithLocalSD(prompt, outputPath);
-    } else if (apiType === 'quick') {
-      // Quick placeholder (for testing)
-      logger.info(`Generating quick image for: ${sceneText}`);
-      return await generateQuickImage(sceneText, outputPath);
     } else {
-      // Default to Hugging Face
-      return await generateWithHuggingFace(prompt, outputPath);
+      // Default: quick placeholder (works immediately, no API needed)
+      logger.info(`Generating placeholder image for: ${sceneText}`);
+      return await generateQuickImage(sceneText, outputPath);
     }
   } catch (error) {
     logger.error(`Image generation failed for scene ${sceneIndex}:`, error);
