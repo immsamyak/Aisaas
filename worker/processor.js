@@ -24,18 +24,22 @@ const connection = new Redis({
 // Connect to MongoDB
 async function connectDB() {
   try {
+    console.log('Connecting to MongoDB...');
     await mongoose.connect(process.env.MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
+    console.log('Worker: MongoDB connected successfully');
     logger.info('Worker: MongoDB connected');
   } catch (error) {
+    console.error('Worker: MongoDB connection error:', error);
     logger.error('Worker: MongoDB connection error:', error);
     process.exit(1);
   }
 }
 
-connectDB();
+// Wait for MongoDB connection before starting worker
+await connectDB();
 
 /**
  * Main video generation processor
