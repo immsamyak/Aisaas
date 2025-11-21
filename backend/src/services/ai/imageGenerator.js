@@ -367,9 +367,15 @@ export async function generateSceneImage(sceneText, sceneIndex, style = 'realist
   } catch (error) {
     logger.error(`Image generation failed for scene ${sceneIndex}:`, error);
     
-    // Create placeholder image if generation fails
-    const placeholderPath = await createPlaceholderImage(outputPath, sceneText);
-    return placeholderPath;
+    // Fallback to quick placeholder image if API fails
+    logger.warn('Falling back to placeholder image');
+    try {
+      const placeholderPath = await generateQuickImage(sceneText, outputPath);
+      return placeholderPath;
+    } catch (placeholderError) {
+      logger.error('Placeholder generation also failed:', placeholderError);
+      throw error;
+    }
   }
 }
 
