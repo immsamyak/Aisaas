@@ -5,6 +5,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import logger from '../../utils/logger.js';
 import { fileURLToPath } from 'url';
+import { generateQuickImage } from './quickImage.js';
 
 const execPromise = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
@@ -278,16 +279,19 @@ export async function generateSceneImage(sceneText, sceneIndex, style = 'realist
   const prompt = buildPrompt(sceneText, style);
   
   // Choose API based on environment variable
-  const apiType = process.env.IMAGE_API_TYPE || 'local';
+  const apiType = process.env.IMAGE_API_TYPE || 'quick';
   
   try {
     if (apiType === 'comfyui') {
       return await generateWithComfyUI(prompt, outputPath);
     } else if (apiType === 'a1111') {
       return await generateWithA1111(prompt, outputPath);
-    } else {
-      // Default: local Stable Diffusion
+    } else if (apiType === 'local') {
       return await generateWithLocalSD(prompt, outputPath);
+    } else {
+      // Default: quick placeholder (fast, no GPU needed)
+      logger.info(`Generating quick image for: ${sceneText}`);
+      return await generateQuickImage(sceneText, outputPath);
     }
   } catch (error) {
     logger.error(`Image generation failed for scene ${sceneIndex}:`, error);
