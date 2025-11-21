@@ -72,6 +72,13 @@ async function generateWithHuggingFace(prompt, outputPath) {
     
   } catch (error) {
     logger.error('Hugging Face generation error:', error.message);
+    logger.error('Full error:', error.response?.data || error);
+    console.error('========================================');
+    console.error('HUGGING FACE API ERROR:');
+    console.error('Error message:', error.message);
+    console.error('Status:', error.response?.status);
+    console.error('Response:', error.response?.data);
+    console.error('========================================');
     throw new Error(`Hugging Face image generation failed: ${error.message}`);
   }
 }
