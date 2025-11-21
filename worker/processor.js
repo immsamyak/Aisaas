@@ -6,12 +6,14 @@ import path from 'path';
 import fs from 'fs';
 
 // Import backend services (shared code)
-import Job from '../backend/src/models/Job.js';
 import logger from '../backend/utils/logger.js';
 import { splitTextIntoScenes } from '../backend/src/services/ai/textSplitter.js';
 import { generateSceneImage } from '../backend/src/services/ai/imageGenerator.js';
 import { generateSceneAudio } from '../backend/src/services/ai/ttsGenerator.js';
 import renderService from '../backend/src/services/video/renderService.js';
+
+// We'll define Job model after MongoDB connection is established
+let Job;
 
 // Redis connection
 const connection = new Redis({
@@ -21,7 +23,7 @@ const connection = new Redis({
   maxRetriesPerRequest: null
 });
 
-// Connect to MongoDB
+// Connect to MongoDB and define Job model
 async function connectDB() {
   try {
     console.log('Connecting to MongoDB...');
@@ -31,6 +33,42 @@ async function connectDB() {
     });
     console.log('Worker: MongoDB connected successfully');
     logger.info('Worker: MongoDB connected');
+    
+    // Now define the Job model with this connection
+    const jobSchema = new mongoose.Schema({
+      jobId: { type: String, required: true, unique: true, index: true },
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      inputText: { type: String, required: true },
+      status: { type: String, enum: ['pending', 'processing', 'completed', 'failed'], default: 'pending', index: true },
+      progress: { type: Number, default: 0, min: 0, max: 100 },
+      currentStep: { type: String, default: 'queued' },
+      scenes: [{ sceneIndex: Number, text: String, imageUrl: String, audioUrl: String, duration: Number }],
+      settings: {
+        voiceId: { type: String, default: 'default' },
+        imageStyle: { type: String, default: 'realistic' },
+        musicEnabled: { type: Boolean, default: true },
+        subtitlesEnabled: { type: Boolean, default: true }
+      },
+      videoUrl: { type: String, default: null },
+      videoKey: { type: String, default: null },
+      thumbnailUrl: { type: String, default: null },
+      duration: { type: Number, default: 0 },
+      error: { type: String, default: null },
+      metadata: {
+        resolution: { type: String, default: '1080x1920' },
+        fps: { type: Number, default: 30 },
+        fileSize: Number,
+        totalScenes: Number
+      },
+      processingTime: { type: Number, default: 0 },
+      createdAt: { type: Date, default: Date.now, index: true },
+      completedAt: { type: Date, default: null }
+    });
+    
+    // Define model with the current connection
+    Job = mongoose.model('Job', jobSchema);
+    console.log('Job model initialized with worker connection');
+    
   } catch (error) {
     console.error('Worker: MongoDB connection error:', error);
     logger.error('Worker: MongoDB connection error:', error);
