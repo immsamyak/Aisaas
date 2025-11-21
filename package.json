@@ -1,0 +1,27 @@
+{
+  "name": "ai-shorts-generator",
+  "version": "1.0.0",
+  "description": "AI-powered short video generator SaaS",
+  "scripts": {
+    "install-all": "cd backend && npm install && cd ../worker && npm install && cd ../frontend && npm install",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:worker": "cd worker && npm start",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build",
+    "start:production": "pm2 start ecosystem.config.js",
+    "stop:production": "pm2 stop ecosystem.config.js",
+    "logs": "pm2 logs",
+    "clean": "rm -rf backend/temp/* worker/logs/* frontend/.next"
+  },
+  "keywords": [
+    "ai",
+    "video",
+    "generator",
+    "saas",
+    "stable-diffusion",
+    "tts",
+    "ffmpeg"
+  ],
+  "author": "",
+  "license": "MIT"
+}

@@ -1,0 +1,28 @@
+{
+  "name": "ai-shorts-backend",
+  "version": "1.0.0",
+  "description": "Backend API for AI Shorts Video Generator",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^8.0.3",
+    "bullmq": "^5.1.0",
+    "ioredis": "^5.3.2",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5",
+    "axios": "^1.6.2",
+    "uuid": "^9.0.1",
+    "winston": "^3.11.0",
+    "@aws-sdk/client-s3": "^3.478.0",
+    "@aws-sdk/s3-request-presigner": "^3.478.0",
+    "joi": "^17.11.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
