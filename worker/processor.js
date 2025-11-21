@@ -154,10 +154,23 @@ async function processVideoGeneration(job) {
 
     // Step 1: Split text into scenes (10%)
     console.log(`Step 1: Starting text splitting...`);
-    await jobDoc.updateProgress(10, 'Splitting text into scenes');
+    
+    try {
+      console.log(`Calling updateProgress(10, 'Splitting text into scenes')...`);
+      jobDoc.progress = 10;
+      jobDoc.currentStep = 'Splitting text into scenes';
+      await jobDoc.save();
+      console.log(`Progress updated to 10%`);
+    } catch (progressError) {
+      console.error(`Error updating progress:`, progressError.message);
+      logger.error(`Error updating progress:`, progressError);
+    }
+    
     logger.info(`[${jobId}] Step 1: Splitting text`);
     
+    console.log(`Calling splitTextIntoScenes with text length: ${text.length}`);
     const sceneTexts = splitTextIntoScenes(text);
+    console.log(`Split complete: ${sceneTexts.length} scenes created`);
     logger.info(`[${jobId}] Created ${sceneTexts.length} scenes`);
 
     // Step 2: Generate images for each scene (10% to 40%)
@@ -257,12 +270,25 @@ async function processVideoGeneration(job) {
     };
 
   } catch (error) {
+    console.error(`========================================`);
+    console.error(`ERROR in job ${jobId}:`);
+    console.error(`Error message: ${error.message}`);
+    console.error(`Error stack: ${error.stack}`);
+    console.error(`========================================`);
+    
     logger.error(`[${jobId}] Video generation failed:`, error);
     
     // Mark job as failed
-    const jobDoc = await Job.findOne({ jobId });
-    if (jobDoc) {
-      await jobDoc.markFailed(error.message);
+    try {
+      const jobDoc = await Job.findOne({ jobId });
+      if (jobDoc) {
+        jobDoc.status = 'failed';
+        jobDoc.error = error.message;
+        jobDoc.completedAt = new Date();
+        await jobDoc.save();
+      }
+    } catch (updateError) {
+      console.error(`Failed to update job status:`, updateError.message);
     }
     
     throw error;
