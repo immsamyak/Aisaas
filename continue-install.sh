@@ -5,7 +5,7 @@
 
 set -e
 
-PROJECT_DIR="/home/aisaas/ai-shorts-generator"
+PROJECT_DIR="/home/aisaas/Aisaas"
 DOMAIN="aisaas.alvicsinfo.tech"
 BACKEND_PORT=5000
 WORKER_PORT=5001
