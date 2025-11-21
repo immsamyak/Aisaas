@@ -47,11 +47,23 @@ await connectDB();
 async function processVideoGeneration(job) {
   const { jobId, text, voiceId, imageStyle, musicEnabled, subtitlesEnabled } = job.data;
   
+  console.log('========================================');
+  console.log(`RECEIVED JOB: ${jobId}`);
+  console.log(`Text length: ${text?.length || 0} chars`);
+  console.log(`Voice: ${voiceId}, Style: ${imageStyle}`);
+  console.log('========================================');
+  
   logger.info(`Processing video generation job: ${jobId}`);
   
   try {
+    console.log(`Looking up job in MongoDB: ${jobId}`);
+    console.log(`MongoDB connection state: ${mongoose.connection.readyState}`); // 1 = connected
+    
     // Find job document
     const jobDoc = await Job.findOne({ jobId });
+    
+    console.log(`Job document found: ${!!jobDoc}`);
+    
     if (!jobDoc) {
       throw new Error('Job document not found');
     }
