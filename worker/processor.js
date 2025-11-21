@@ -112,10 +112,13 @@ async function processVideoGeneration(job) {
     }
 
     // Update status
+    console.log(`Updating job status to 'processing'...`);
     jobDoc.status = 'processing';
     await jobDoc.save();
+    console.log(`Job status updated successfully`);
 
     // Step 1: Split text into scenes (10%)
+    console.log(`Step 1: Starting text splitting...`);
     await jobDoc.updateProgress(10, 'Splitting text into scenes');
     logger.info(`[${jobId}] Step 1: Splitting text`);
     
