@@ -58,11 +58,16 @@ async function processVideoGeneration(job) {
   try {
     console.log(`Looking up job in MongoDB: ${jobId}`);
     console.log(`MongoDB connection state: ${mongoose.connection.readyState}`); // 1 = connected
+    console.log(`Database name: ${mongoose.connection.name}`);
+    console.log(`Job model collection: ${Job.collection.name}`);
     
-    // Find job document
-    const jobDoc = await Job.findOne({ jobId });
+    // Find job document with explicit timeout
+    const jobDoc = await Job.findOne({ jobId }).maxTimeMS(5000);
     
     console.log(`Job document found: ${!!jobDoc}`);
+    if (jobDoc) {
+      console.log(`Job status: ${jobDoc.status}`);
+    }
     
     if (!jobDoc) {
       throw new Error('Job document not found');
