@@ -55,7 +55,7 @@ export async function generateVideo(req, res) {
     await job.save();
 
     // Enqueue job to BullMQ
-    await videoQueue.add('generate-video', {
+    await videoQueue.add('video-generation', {
       jobId,
       text,
       voiceId,
