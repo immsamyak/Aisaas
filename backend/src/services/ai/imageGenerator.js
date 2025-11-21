@@ -1,7 +1,63 @@
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import logger from '../../utils/logger.js';
+import { fileURLToPath } from 'url';
+
+const execPromise = promisify(exec);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/**
+ * Generate image using local Stable Diffusion (Python)
+ * @param {string} prompt - Image generation prompt
+ * @param {string} outputPath - Path to save image
+ * @returns {Promise<string>} - Path to generated image
+ */
+async function generateWithLocalSD(prompt, outputPath) {
+  try {
+    logger.info(`Generating image with Local SD: ${prompt.substring(0, 50)}...`);
+    
+    const pythonScript = path.join(__dirname, 'localSD.py');
+    const venvPython = path.join(__dirname, 'sd_env', 'bin', 'python3');
+    
+    // Check if venv exists, otherwise use system python3
+    const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python3';
+    
+    // Escape quotes in prompt
+    const escapedPrompt = prompt.replace(/"/g, '\\"');
+    
+    const command = `${pythonCmd} "${pythonScript}" "${escapedPrompt}" "${outputPath}"`;
+    
+    logger.info('Executing: ' + command);
+    
+    const { stdout, stderr } = await execPromise(command, {
+      timeout: 300000, // 5 minutes timeout
+      maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+    });
+    
+    if (stderr) {
+      logger.info('SD stderr: ' + stderr);
+    }
+    
+    if (stdout) {
+      logger.info('SD stdout: ' + stdout);
+    }
+    
+    if (!fs.existsSync(outputPath)) {
+      throw new Error('Image file was not created');
+    }
+    
+    logger.info(`Image saved to ${outputPath}`);
+    return outputPath;
+    
+  } catch (error) {
+    logger.error('Local SD generation error:', error.message);
+    throw new Error(`Local SD image generation failed: ${error.message}`);
+  }
+}
 
 /**
  * Generate image using Automatic1111 API
@@ -222,13 +278,16 @@ export async function generateSceneImage(sceneText, sceneIndex, style = 'realist
   const prompt = buildPrompt(sceneText, style);
   
   // Choose API based on environment variable
-  const apiType = process.env.IMAGE_API_TYPE || 'a1111';
+  const apiType = process.env.IMAGE_API_TYPE || 'local';
   
   try {
     if (apiType === 'comfyui') {
       return await generateWithComfyUI(prompt, outputPath);
-    } else {
+    } else if (apiType === 'a1111') {
       return await generateWithA1111(prompt, outputPath);
+    } else {
+      // Default: local Stable Diffusion
+      return await generateWithLocalSD(prompt, outputPath);
     }
   } catch (error) {
     logger.error(`Image generation failed for scene ${sceneIndex}:`, error);
