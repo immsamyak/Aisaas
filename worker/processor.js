@@ -6,12 +6,12 @@ import path from 'path';
 import fs from 'fs';
 
 // Import backend services (shared code)
-import Job from '../backend/models/Job.js';
+import Job from '../backend/src/models/Job.js';
 import logger from '../backend/utils/logger.js';
-import { splitTextIntoScenes } from '../backend/services/ai/textSplitter.js';
-import { generateSceneImage } from '../backend/services/ai/imageGenerator.js';
-import { generateSceneAudio } from '../backend/services/ai/ttsGenerator.js';
-import renderService from '../backend/services/video/renderService.js';
+import { splitTextIntoScenes } from '../backend/src/services/ai/textSplitter.js';
+import { generateSceneImage } from '../backend/src/services/ai/imageGenerator.js';
+import { generateSceneAudio } from '../backend/src/services/ai/ttsGenerator.js';
+import renderService from '../backend/src/services/video/renderService.js';
 
 // Redis connection
 const connection = new Redis({
