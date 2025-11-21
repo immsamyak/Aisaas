@@ -27,8 +27,8 @@ async function generateWithHuggingFace(prompt, outputPath) {
   try {
     logger.info(`Generating image with Hugging Face: ${prompt.substring(0, 50)}...`);
     
-    // Using the NEW Hugging Face endpoint (router.huggingface.co)
-    const modelUrl = 'https://router.huggingface.co/models/black-forest-labs/FLUX.1-schnell';
+    // Using Stable Diffusion 2.1 (works with free tier)
+    const modelUrl = 'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1';
     
     const response = await axios.post(
       modelUrl,
