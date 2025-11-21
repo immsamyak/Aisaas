@@ -201,6 +201,7 @@ worker.on('stalled', (jobId) => {
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, closing worker gracefully');
   logger.info('SIGTERM received, closing worker gracefully');
   await worker.close();
   await connection.quit();
@@ -209,12 +210,19 @@ process.on('SIGTERM', async () => {
 });
 
 process.on('SIGINT', async () => {
+  console.log('SIGINT received, closing worker gracefully');
   logger.info('SIGINT received, closing worker gracefully');
   await worker.close();
   await connection.quit();
   await mongoose.connection.close();
   process.exit(0);
 });
+
+console.log('========================================');
+console.log('Worker started and waiting for jobs...');
+console.log(`Worker concurrency: ${worker.opts.concurrency}`);
+console.log(`Connected to Redis: ${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`);
+console.log('========================================');
 
 logger.info('Worker started and waiting for jobs...');
 logger.info(`Worker concurrency: ${worker.opts.concurrency}`);
