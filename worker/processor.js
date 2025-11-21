@@ -65,6 +65,30 @@ async function connectDB() {
       completedAt: { type: Date, default: null }
     });
     
+    // Add methods to the schema
+    jobSchema.methods.updateProgress = async function(progress, step) {
+      this.progress = progress;
+      this.currentStep = step;
+      await this.save();
+    };
+    
+    jobSchema.methods.markCompleted = async function(videoUrl, videoKey) {
+      this.status = 'completed';
+      this.progress = 100;
+      this.videoUrl = videoUrl;
+      this.videoKey = videoKey;
+      this.completedAt = new Date();
+      this.processingTime = Math.round((this.completedAt - this.createdAt) / 1000);
+      await this.save();
+    };
+    
+    jobSchema.methods.markFailed = async function(error) {
+      this.status = 'failed';
+      this.error = error;
+      this.completedAt = new Date();
+      await this.save();
+    };
+    
     // Define model with the current connection
     Job = mongoose.model('Job', jobSchema);
     console.log('Job model initialized with worker connection');
@@ -109,6 +133,17 @@ async function processVideoGeneration(job) {
     
     if (!jobDoc) {
       throw new Error('Job document not found');
+    }
+    
+    // Check if already being processed or completed
+    if (jobDoc.status === 'processing') {
+      console.log(`Job ${jobId} is already being processed, skipping...`);
+      return { success: false, message: 'Job already being processed' };
+    }
+    
+    if (jobDoc.status === 'completed') {
+      console.log(`Job ${jobId} is already completed, skipping...`);
+      return { success: true, message: 'Job already completed', videoUrl: jobDoc.videoUrl };
     }
 
     // Update status
