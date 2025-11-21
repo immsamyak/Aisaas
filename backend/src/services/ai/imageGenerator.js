@@ -27,31 +27,36 @@ async function generateWithHuggingFace(prompt, outputPath) {
   try {
     logger.info(`Generating image with Hugging Face: ${prompt.substring(0, 50)}...`);
     
-    // Using Stable Diffusion XL model (free tier)
-    const modelUrl = 'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0';
+    // Using a different free model that works
+    const modelUrl = 'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell';
     
     const response = await axios.post(
       modelUrl,
-      { inputs: prompt },
+      { 
+        inputs: prompt,
+        options: { wait_for_model: true }
+      },
       {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         },
         responseType: 'arraybuffer',
-        timeout: 60000 // 60 second timeout
+        timeout: 120000 // 120 second timeout
       }
     );
 
-    // Check if model is loading
+    // Check if model is loading or error response
     if (response.headers['content-type']?.includes('application/json')) {
       const jsonResponse = JSON.parse(response.data.toString());
-      if (jsonResponse.error && jsonResponse.error.includes('loading')) {
-        logger.info('Model is loading, retrying in 20 seconds...');
-        await new Promise(resolve => setTimeout(resolve, 20000));
-        return await generateWithHuggingFace(prompt, outputPath);
+      if (jsonResponse.error) {
+        if (jsonResponse.error.includes('loading')) {
+          logger.info('Model is loading, retrying in 20 seconds...');
+          await new Promise(resolve => setTimeout(resolve, 20000));
+          return await generateWithHuggingFace(prompt, outputPath);
+        }
+        throw new Error(jsonResponse.error);
       }
-      throw new Error(jsonResponse.error || 'Unknown error from Hugging Face');
     }
 
     // Save image
@@ -72,13 +77,18 @@ async function generateWithHuggingFace(prompt, outputPath) {
     
   } catch (error) {
     logger.error('Hugging Face generation error:', error.message);
-    logger.error('Full error:', error.response?.data || error);
-    console.error('========================================');
-    console.error('HUGGING FACE API ERROR:');
-    console.error('Error message:', error.message);
-    console.error('Status:', error.response?.status);
-    console.error('Response:', error.response?.data);
-    console.error('========================================');
+    if (error.response?.data) {
+      const errorMsg = Buffer.isBuffer(error.response.data) 
+        ? error.response.data.toString() 
+        : JSON.stringify(error.response.data);
+      logger.error('Response:', errorMsg);
+      console.error('========================================');
+      console.error('HUGGING FACE API ERROR:');
+      console.error('Error message:', error.message);
+      console.error('Status:', error.response?.status);
+      console.error('Response:', errorMsg);
+      console.error('========================================');
+    }
     throw new Error(`Hugging Face image generation failed: ${error.message}`);
   }
 }
