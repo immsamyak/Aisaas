@@ -34,8 +34,8 @@ async function generateWithLocalSD(prompt, outputPath) {
     logger.info('Executing: ' + command);
     
     const { stdout, stderr } = await execPromise(command, {
-      timeout: 300000, // 5 minutes timeout
-      maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+      timeout: 600000, // 10 minutes timeout (for model download on first run)
+      maxBuffer: 50 * 1024 * 1024 // 50MB buffer
     });
     
     if (stderr) {
