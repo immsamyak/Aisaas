@@ -32,21 +32,37 @@ def generate_image(prompt, output_path, style="realistic"):
         print(f"Generating image for prompt: {prompt[:50]}...", file=sys.stderr)
         
         # Generate image
-        image = pipe(
+        result = pipe(
             prompt=prompt,
             negative_prompt="blurry, bad quality, distorted, ugly, watermark, text, signature",
             num_inference_steps=20,  # Reduced for faster generation
             guidance_scale=7.5,
             width=512,  # Smaller size for CPU
             height=912,  # Portrait aspect ratio
-        ).images[0]
+        )
         
-        # Resize to target resolution
-        image = image.resize((1080, 1920))
+        image = result.images[0]
         
-        # Save image
+        # Resize to target resolution using high quality resampling
+        from PIL import Image as PILImage
+        image = image.resize((1080, 1920), PILImage.Resampling.LANCZOS)
+        
+        # Ensure output directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        image.save(output_path)
+        
+        # Save image with explicit format and optimization
+        image.save(output_path, format='PNG', optimize=True)
+        
+        # Verify the file was created and is valid
+        if not os.path.exists(output_path):
+            raise Exception("Image file was not created")
+        
+        if os.path.getsize(output_path) < 1000:
+            raise Exception("Image file is too small, likely corrupted")
+        
+        # Try to reopen the image to verify it's valid
+        test_image = PILImage.open(output_path)
+        test_image.verify()
         
         print(f"Image saved to: {output_path}", file=sys.stderr)
         print(output_path)  # Output path to stdout
@@ -54,6 +70,8 @@ def generate_image(prompt, output_path, style="realistic"):
         
     except Exception as e:
         print(f"Error generating image: {str(e)}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return 1
 
 if __name__ == "__main__":
