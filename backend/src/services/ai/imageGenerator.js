@@ -12,6 +12,71 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
+ * Generate image using Hugging Face Inference API (FREE)
+ * @param {string} prompt - Image generation prompt
+ * @param {string} outputPath - Path to save image
+ * @returns {Promise<string>} - Path to generated image
+ */
+async function generateWithHuggingFace(prompt, outputPath) {
+  const apiKey = process.env.HUGGINGFACE_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('HUGGINGFACE_API_KEY not found in environment variables');
+  }
+
+  try {
+    logger.info(`Generating image with Hugging Face: ${prompt.substring(0, 50)}...`);
+    
+    // Using Stable Diffusion XL model (free tier)
+    const modelUrl = 'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0';
+    
+    const response = await axios.post(
+      modelUrl,
+      { inputs: prompt },
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        responseType: 'arraybuffer',
+        timeout: 60000 // 60 second timeout
+      }
+    );
+
+    // Check if model is loading
+    if (response.headers['content-type']?.includes('application/json')) {
+      const jsonResponse = JSON.parse(response.data.toString());
+      if (jsonResponse.error && jsonResponse.error.includes('loading')) {
+        logger.info('Model is loading, retrying in 20 seconds...');
+        await new Promise(resolve => setTimeout(resolve, 20000));
+        return await generateWithHuggingFace(prompt, outputPath);
+      }
+      throw new Error(jsonResponse.error || 'Unknown error from Hugging Face');
+    }
+
+    // Save image
+    const dir = path.dirname(outputPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    fs.writeFileSync(outputPath, response.data);
+    
+    // Verify file
+    if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size < 1000) {
+      throw new Error('Generated image is invalid or too small');
+    }
+    
+    logger.info(`Image saved to ${outputPath}`);
+    return outputPath;
+    
+  } catch (error) {
+    logger.error('Hugging Face generation error:', error.message);
+    throw new Error(`Hugging Face image generation failed: ${error.message}`);
+  }
+}
+
+/**
  * Generate image using local Stable Diffusion (Python)
  * @param {string} prompt - Image generation prompt
  * @param {string} outputPath - Path to save image
@@ -279,19 +344,25 @@ export async function generateSceneImage(sceneText, sceneIndex, style = 'realist
   const prompt = buildPrompt(sceneText, style);
   
   // Choose API based on environment variable
-  const apiType = process.env.IMAGE_API_TYPE || 'quick';
+  const apiType = process.env.IMAGE_API_TYPE || 'huggingface';
   
   try {
-    if (apiType === 'comfyui') {
+    if (apiType === 'huggingface' || apiType === 'hf') {
+      // Use free Hugging Face API (default)
+      return await generateWithHuggingFace(prompt, outputPath);
+    } else if (apiType === 'comfyui') {
       return await generateWithComfyUI(prompt, outputPath);
     } else if (apiType === 'a1111') {
       return await generateWithA1111(prompt, outputPath);
     } else if (apiType === 'local') {
       return await generateWithLocalSD(prompt, outputPath);
-    } else {
-      // Default: quick placeholder (fast, no GPU needed)
+    } else if (apiType === 'quick') {
+      // Quick placeholder (for testing)
       logger.info(`Generating quick image for: ${sceneText}`);
       return await generateQuickImage(sceneText, outputPath);
+    } else {
+      // Default to Hugging Face
+      return await generateWithHuggingFace(prompt, outputPath);
     }
   } catch (error) {
     logger.error(`Image generation failed for scene ${sceneIndex}:`, error);
